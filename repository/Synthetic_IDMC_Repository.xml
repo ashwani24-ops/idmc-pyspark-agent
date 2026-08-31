@@ -1,0 +1,403 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SYNTHETIC IDMC-LIKE REPOSITORY SAMPLE
+  This is NOT an official Informatica IDMC export format.
+  It is intentionally structured to exercise an IDMC-to-PySpark transpiler PoC.
+-->
+<REPOSITORY NAME="Synthetic_IDMC_Repository" VERSION="1.0">
+
+    <FOLDER NAME="Sales">
+
+        <MAPPING NAME="m_Sales_Customer_Load" DESCRIPTION="Customer enrichment and active-customer load">
+
+            <!-- ========================================================= -->
+            <!-- SOURCES                                                    -->
+            <!-- ========================================================= -->
+
+            <SOURCE NAME="SRC_CUSTOMER" TYPE="DATABASE">
+                <FIELD NAME="CUSTOMER_ID" DATATYPE="INTEGER"/>
+                <FIELD NAME="FIRST_NAME" DATATYPE="STRING"/>
+                <FIELD NAME="LAST_NAME" DATATYPE="STRING"/>
+                <FIELD NAME="EMAIL" DATATYPE="STRING"/>
+                <FIELD NAME="STATUS" DATATYPE="STRING"/>
+                <FIELD NAME="COUNTRY_CODE" DATATYPE="STRING"/>
+                <FIELD NAME="CUSTOMER_TIER" DATATYPE="STRING"/>
+                <FIELD NAME="UPDATED_DATE" DATATYPE="TIMESTAMP"/>
+            </SOURCE>
+
+            <SOURCE NAME="SRC_COUNTRY" TYPE="DATABASE">
+                <FIELD NAME="COUNTRY_CODE" DATATYPE="STRING"/>
+                <FIELD NAME="COUNTRY_NAME" DATATYPE="STRING"/>
+                <FIELD NAME="REGION" DATATYPE="STRING"/>
+            </SOURCE>
+
+            <!-- ========================================================= -->
+            <!-- TRANSFORMATION 1: FILTER                                  -->
+            <!-- ========================================================= -->
+
+            <TRANSFORMATION NAME="FIL_ACTIVE_CUSTOMER" TYPE="Filter">
+                <ATTRIBUTE NAME="FILTER_CONDITION"
+                           VALUE="STATUS = 'ACTIVE' AND CUSTOMER_ID IS NOT NULL"/>
+            </TRANSFORMATION>
+
+            <!-- ========================================================= -->
+            <!-- TRANSFORMATION 2: EXPRESSION                              -->
+            <!-- ========================================================= -->
+
+            <TRANSFORMATION NAME="EXP_CUSTOMER" TYPE="Expression">
+
+                <PORT NAME="CUSTOMER_ID"
+                      DATATYPE="INTEGER"
+                      PORTTYPE="INPUT"/>
+
+                <PORT NAME="FIRST_NAME"
+                      DATATYPE="STRING"
+                      PORTTYPE="INPUT"/>
+
+                <PORT NAME="LAST_NAME"
+                      DATATYPE="STRING"
+                      PORTTYPE="INPUT"/>
+
+                <PORT NAME="EMAIL"
+                      DATATYPE="STRING"
+                      PORTTYPE="INPUT"/>
+
+                <PORT NAME="COUNTRY_CODE"
+                      DATATYPE="STRING"
+                      PORTTYPE="INPUT"/>
+
+                <PORT NAME="FULL_NAME"
+                      DATATYPE="STRING"
+                      PORTTYPE="OUTPUT"
+                      EXPRESSION="TRIM(FIRST_NAME) || ' ' || TRIM(LAST_NAME)"/>
+
+                <PORT NAME="EMAIL_NORMALIZED"
+                      DATATYPE="STRING"
+                      PORTTYPE="OUTPUT"
+                      EXPRESSION="LOWER(TRIM(EMAIL))"/>
+
+                <PORT NAME="CUSTOMER_KEY"
+                      DATATYPE="STRING"
+                      PORTTYPE="OUTPUT"
+                      EXPRESSION="TO_CHAR(CUSTOMER_ID) || '-' || COUNTRY_CODE"/>
+
+            </TRANSFORMATION>
+
+            <!-- ========================================================= -->
+            <!-- TRANSFORMATION 3: LOOKUP                                  -->
+            <!-- ========================================================= -->
+
+            <TRANSFORMATION NAME="LKP_COUNTRY" TYPE="Lookup">
+
+                <ATTRIBUTE NAME="LOOKUP_SOURCE"
+                           VALUE="SRC_COUNTRY"/>
+
+                <ATTRIBUTE NAME="LOOKUP_CONDITION"
+                           VALUE="COUNTRY_CODE = COUNTRY_CODE"/>
+
+                <ATTRIBUTE NAME="LOOKUP_TYPE"
+                           VALUE="CONNECTED"/>
+
+                <ATTRIBUTE NAME="MULTIPLE_MATCH_POLICY"
+                           VALUE="RETURN_FIRST"/>
+
+                <PORT NAME="COUNTRY_CODE"
+                      DATATYPE="STRING"
+                      PORTTYPE="INPUT"/>
+
+                <PORT NAME="COUNTRY_NAME"
+                      DATATYPE="STRING"
+                      PORTTYPE="OUTPUT"/>
+
+                <PORT NAME="REGION"
+                      DATATYPE="STRING"
+                      PORTTYPE="OUTPUT"/>
+
+            </TRANSFORMATION>
+
+            <!-- ========================================================= -->
+            <!-- TRANSFORMATION 4: ROUTER                                  -->
+            <!-- ========================================================= -->
+
+            <TRANSFORMATION NAME="RTR_CUSTOMER_TIER" TYPE="Router">
+
+                <GROUP NAME="PREMIUM"
+                       CONDITION="CUSTOMER_TIER = 'PREMIUM'"/>
+
+                <GROUP NAME="STANDARD"
+                       CONDITION="CUSTOMER_TIER = 'STANDARD'"/>
+
+                <GROUP NAME="DEFAULT"
+                       CONDITION="TRUE"/>
+
+            </TRANSFORMATION>
+
+            <!-- ========================================================= -->
+            <!-- TRANSFORMATION 5: AGGREGATOR                              -->
+            <!-- ========================================================= -->
+
+            <TRANSFORMATION NAME="AGG_REGION_CUSTOMERS" TYPE="Aggregator">
+
+                <GROUPBY FIELD="REGION"/>
+
+                <AGGREGATE FIELD="CUSTOMER_ID"
+                            FUNCTION="COUNT"
+                            OUTPUT="CUSTOMER_COUNT"/>
+
+                <AGGREGATE FIELD="CUSTOMER_ID"
+                            FUNCTION="MAX"
+                            OUTPUT="MAX_CUSTOMER_ID"/>
+
+            </TRANSFORMATION>
+
+            <!-- ========================================================= -->
+            <!-- TRANSFORMATION 6: SORTER                                  -->
+            <!-- ========================================================= -->
+
+            <TRANSFORMATION NAME="SRT_CUSTOMER" TYPE="Sorter">
+
+                <SORTFIELD FIELD="REGION" ORDER="ASC"/>
+
+                <SORTFIELD FIELD="CUSTOMER_COUNT" ORDER="DESC"/>
+
+            </TRANSFORMATION>
+
+            <!-- ========================================================= -->
+            <!-- TARGETS                                                   -->
+            <!-- ========================================================= -->
+
+            <TARGET NAME="DIM_CUSTOMER" TYPE="DELTA">
+                <FIELD NAME="CUSTOMER_ID" DATATYPE="INTEGER"/>
+                <FIELD NAME="CUSTOMER_KEY" DATATYPE="STRING"/>
+                <FIELD NAME="FULL_NAME" DATATYPE="STRING"/>
+                <FIELD NAME="EMAIL_NORMALIZED" DATATYPE="STRING"/>
+                <FIELD NAME="COUNTRY_CODE" DATATYPE="STRING"/>
+                <FIELD NAME="COUNTRY_NAME" DATATYPE="STRING"/>
+                <FIELD NAME="REGION" DATATYPE="STRING"/>
+            </TARGET>
+
+            <TARGET NAME="AGG_CUSTOMER_REGION" TYPE="DELTA">
+                <FIELD NAME="REGION" DATATYPE="STRING"/>
+                <FIELD NAME="CUSTOMER_COUNT" DATATYPE="LONG"/>
+                <FIELD NAME="MAX_CUSTOMER_ID" DATATYPE="INTEGER"/>
+            </TARGET>
+
+            <!-- ========================================================= -->
+            <!-- CONNECTORS: DATA FLOW                                    -->
+            <!-- ========================================================= -->
+
+            <CONNECTOR FROMINSTANCE="SRC_CUSTOMER"
+                       FROMFIELD="CUSTOMER_ID"
+                       TOINSTANCE="FIL_ACTIVE_CUSTOMER"
+                       TOFIELD="CUSTOMER_ID"/>
+
+            <CONNECTOR FROMINSTANCE="SRC_CUSTOMER"
+                       FROMFIELD="FIRST_NAME"
+                       TOINSTANCE="FIL_ACTIVE_CUSTOMER"
+                       TOFIELD="FIRST_NAME"/>
+
+            <CONNECTOR FROMINSTANCE="SRC_CUSTOMER"
+                       FROMFIELD="LAST_NAME"
+                       TOINSTANCE="FIL_ACTIVE_CUSTOMER"
+                       TOFIELD="LAST_NAME"/>
+
+            <CONNECTOR FROMINSTANCE="SRC_CUSTOMER"
+                       FROMFIELD="EMAIL"
+                       TOINSTANCE="FIL_ACTIVE_CUSTOMER"
+                       TOFIELD="EMAIL"/>
+
+            <CONNECTOR FROMINSTANCE="SRC_CUSTOMER"
+                       FROMFIELD="STATUS"
+                       TOINSTANCE="FIL_ACTIVE_CUSTOMER"
+                       TOFIELD="STATUS"/>
+
+            <CONNECTOR FROMINSTANCE="SRC_CUSTOMER"
+                       FROMFIELD="COUNTRY_CODE"
+                       TOINSTANCE="FIL_ACTIVE_CUSTOMER"
+                       TOFIELD="COUNTRY_CODE"/>
+
+            <CONNECTOR FROMINSTANCE="SRC_CUSTOMER"
+                       FROMFIELD="CUSTOMER_TIER"
+                       TOINSTANCE="FIL_ACTIVE_CUSTOMER"
+                       TOFIELD="CUSTOMER_TIER"/>
+
+            <CONNECTOR FROMINSTANCE="FIL_ACTIVE_CUSTOMER"
+                       FROMFIELD="CUSTOMER_ID"
+                       TOINSTANCE="EXP_CUSTOMER"
+                       TOFIELD="CUSTOMER_ID"/>
+
+            <CONNECTOR FROMINSTANCE="FIL_ACTIVE_CUSTOMER"
+                       FROMFIELD="FIRST_NAME"
+                       TOINSTANCE="EXP_CUSTOMER"
+                       TOFIELD="FIRST_NAME"/>
+
+            <CONNECTOR FROMINSTANCE="FIL_ACTIVE_CUSTOMER"
+                       FROMFIELD="LAST_NAME"
+                       TOINSTANCE="EXP_CUSTOMER"
+                       TOFIELD="LAST_NAME"/>
+
+            <CONNECTOR FROMINSTANCE="FIL_ACTIVE_CUSTOMER"
+                       FROMFIELD="EMAIL"
+                       TOINSTANCE="EXP_CUSTOMER"
+                       TOFIELD="EMAIL"/>
+
+            <CONNECTOR FROMINSTANCE="FIL_ACTIVE_CUSTOMER"
+                       FROMFIELD="COUNTRY_CODE"
+                       TOINSTANCE="EXP_CUSTOMER"
+                       TOFIELD="COUNTRY_CODE"/>
+
+            <CONNECTOR FROMINSTANCE="EXP_CUSTOMER"
+                       FROMFIELD="COUNTRY_CODE"
+                       TOINSTANCE="LKP_COUNTRY"
+                       TOFIELD="COUNTRY_CODE"/>
+
+            <CONNECTOR FROMINSTANCE="LKP_COUNTRY"
+                       FROMFIELD="COUNTRY_NAME"
+                       TOINSTANCE="RTR_CUSTOMER_TIER"
+                       TOFIELD="COUNTRY_NAME"/>
+
+            <CONNECTOR FROMINSTANCE="EXP_CUSTOMER"
+                       FROMFIELD="CUSTOMER_ID"
+                       TOINSTANCE="RTR_CUSTOMER_TIER"
+                       TOFIELD="CUSTOMER_ID"/>
+
+            <CONNECTOR FROMINSTANCE="EXP_CUSTOMER"
+                       FROMFIELD="CUSTOMER_KEY"
+                       TOINSTANCE="RTR_CUSTOMER_TIER"
+                       TOFIELD="CUSTOMER_KEY"/>
+
+            <CONNECTOR FROMINSTANCE="EXP_CUSTOMER"
+                       FROMFIELD="FULL_NAME"
+                       TOINSTANCE="RTR_CUSTOMER_TIER"
+                       TOFIELD="FULL_NAME"/>
+
+            <CONNECTOR FROMINSTANCE="RTR_CUSTOMER_TIER"
+                       FROMFIELD="CUSTOMER_ID"
+                       TOINSTANCE="DIM_CUSTOMER"
+                       TOFIELD="CUSTOMER_ID"/>
+
+            <CONNECTOR FROMINSTANCE="RTR_CUSTOMER_TIER"
+                       FROMFIELD="CUSTOMER_KEY"
+                       TOINSTANCE="DIM_CUSTOMER"
+                       TOFIELD="CUSTOMER_KEY"/>
+
+            <CONNECTOR FROMINSTANCE="RTR_CUSTOMER_TIER"
+                       FROMFIELD="FULL_NAME"
+                       TOINSTANCE="DIM_CUSTOMER"
+                       TOFIELD="FULL_NAME"/>
+
+            <CONNECTOR FROMINSTANCE="LKP_COUNTRY"
+                       FROMFIELD="COUNTRY_NAME"
+                       TOINSTANCE="DIM_CUSTOMER"
+                       TOFIELD="COUNTRY_NAME"/>
+
+            <CONNECTOR FROMINSTANCE="LKP_COUNTRY"
+                       FROMFIELD="REGION"
+                       TOINSTANCE="DIM_CUSTOMER"
+                       TOFIELD="REGION"/>
+
+        </MAPPING>
+
+        <!-- ============================================================= -->
+        <!-- SECOND MAPPING: ORDER AGGREGATION                             -->
+        <!-- ============================================================= -->
+
+        <MAPPING NAME="m_Order_Region_Aggregation" DESCRIPTION="Order aggregation by region">
+
+            <SOURCE NAME="SRC_ORDER" TYPE="DATABASE">
+                <FIELD NAME="ORDER_ID" DATATYPE="INTEGER"/>
+                <FIELD NAME="CUSTOMER_ID" DATATYPE="INTEGER"/>
+                <FIELD NAME="REGION" DATATYPE="STRING"/>
+                <FIELD NAME="ORDER_AMOUNT" DATATYPE="DECIMAL"/>
+                <FIELD NAME="ORDER_DATE" DATATYPE="DATE"/>
+            </SOURCE>
+
+            <TRANSFORMATION NAME="FIL_RECENT_ORDERS" TYPE="Filter">
+                <ATTRIBUTE NAME="FILTER_CONDITION"
+                           VALUE="ORDER_DATE >= ADD_TO_DATE(CURRENT_DATE, 'DD', -30)"/>
+            </TRANSFORMATION>
+
+            <TRANSFORMATION NAME="AGG_ORDER_REGION" TYPE="Aggregator">
+
+                <GROUPBY FIELD="REGION"/>
+
+                <AGGREGATE FIELD="ORDER_ID"
+                            FUNCTION="COUNT"
+                            OUTPUT="ORDER_COUNT"/>
+
+                <AGGREGATE FIELD="ORDER_AMOUNT"
+                            FUNCTION="SUM"
+                            OUTPUT="TOTAL_ORDER_AMOUNT"/>
+
+                <AGGREGATE FIELD="ORDER_AMOUNT"
+                            FUNCTION="AVG"
+                            OUTPUT="AVG_ORDER_AMOUNT"/>
+
+            </TRANSFORMATION>
+
+            <TARGET NAME="FACT_REGION_ORDER_SUMMARY" TYPE="DELTA">
+                <FIELD NAME="REGION" DATATYPE="STRING"/>
+                <FIELD NAME="ORDER_COUNT" DATATYPE="LONG"/>
+                <FIELD NAME="TOTAL_ORDER_AMOUNT" DATATYPE="DECIMAL"/>
+                <FIELD NAME="AVG_ORDER_AMOUNT" DATATYPE="DECIMAL"/>
+            </TARGET>
+
+            <CONNECTOR FROMINSTANCE="SRC_ORDER"
+                       FROMFIELD="ORDER_ID"
+                       TOINSTANCE="FIL_RECENT_ORDERS"
+                       TOFIELD="ORDER_ID"/>
+
+            <CONNECTOR FROMINSTANCE="SRC_ORDER"
+                       FROMFIELD="REGION"
+                       TOINSTANCE="FIL_RECENT_ORDERS"
+                       TOFIELD="REGION"/>
+
+            <CONNECTOR FROMINSTANCE="SRC_ORDER"
+                       FROMFIELD="ORDER_AMOUNT"
+                       TOINSTANCE="FIL_RECENT_ORDERS"
+                       TOFIELD="ORDER_AMOUNT"/>
+
+            <CONNECTOR FROMINSTANCE="SRC_ORDER"
+                       FROMFIELD="ORDER_DATE"
+                       TOINSTANCE="FIL_RECENT_ORDERS"
+                       TOFIELD="ORDER_DATE"/>
+
+            <CONNECTOR FROMINSTANCE="FIL_RECENT_ORDERS"
+                       FROMFIELD="REGION"
+                       TOINSTANCE="AGG_ORDER_REGION"
+                       TOFIELD="REGION"/>
+
+            <CONNECTOR FROMINSTANCE="FIL_RECENT_ORDERS"
+                       FROMFIELD="ORDER_ID"
+                       TOINSTANCE="AGG_ORDER_REGION"
+                       TOFIELD="ORDER_ID"/>
+
+            <CONNECTOR FROMINSTANCE="FIL_RECENT_ORDERS"
+                       FROMFIELD="ORDER_AMOUNT"
+                       TOINSTANCE="AGG_ORDER_REGION"
+                       TOFIELD="ORDER_AMOUNT"/>
+
+            <CONNECTOR FROMINSTANCE="AGG_ORDER_REGION"
+                       FROMFIELD="REGION"
+                       TOINSTANCE="FACT_REGION_ORDER_SUMMARY"
+                       TOFIELD="REGION"/>
+
+            <CONNECTOR FROMINSTANCE="AGG_ORDER_REGION"
+                       FROMFIELD="ORDER_COUNT"
+                       TOINSTANCE="FACT_REGION_ORDER_SUMMARY"
+                       TOFIELD="ORDER_COUNT"/>
+
+            <CONNECTOR FROMINSTANCE="AGG_ORDER_REGION"
+                       FROMFIELD="TOTAL_ORDER_AMOUNT"
+                       TOINSTANCE="FACT_REGION_ORDER_SUMMARY"
+                       TOFIELD="TOTAL_ORDER_AMOUNT"/>
+
+            <CONNECTOR FROMINSTANCE="AGG_ORDER_REGION"
+                       FROMFIELD="AVG_ORDER_AMOUNT"
+                       TOINSTANCE="FACT_REGION_ORDER_SUMMARY"
+                       TOFIELD="AVG_ORDER_AMOUNT"/>
+
+        </MAPPING>
+
+    </FOLDER>
+</REPOSITORY>

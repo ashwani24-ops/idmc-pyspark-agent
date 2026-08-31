@@ -1,0 +1,56 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "IDMC: Generate IR",
+            "type": "shell",
+            "command": "${command:python.interpreterPath}",
+            "args": [
+                "-m",
+                "parser.generate_ir"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "IDMC: Generate Execution Plan",
+            "type": "shell",
+            "command": "${command:python.interpreterPath}",
+            "args": [
+                "-m",
+                "planner.test_execution_plan"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "IDMC: Generate Copilot Prompt",
+            "type": "shell",
+            "command": "${command:python.interpreterPath}",
+            "args": [
+                "-m",
+                "copilot.generate_prompt"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "IDMC: Prepare Migration",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "IDMC: Generate IR",
+                "IDMC: Generate Execution Plan",
+                "IDMC: Generate Copilot Prompt"
+            ],
+            "type": "shell",
+            "command": "echo IDMC migration preparation completed",
+            "problemMatcher": []
+        }
+    ]
+}

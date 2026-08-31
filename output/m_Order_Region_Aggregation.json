@@ -1,0 +1,235 @@
+{
+  "name": "m_Order_Region_Aggregation",
+  "description": "Order aggregation by region",
+  "sources": [
+    {
+      "name": "SRC_ORDER",
+      "type": "DATABASE",
+      "fields": [
+        {
+          "name": "ORDER_ID",
+          "datatype": "INTEGER"
+        },
+        {
+          "name": "CUSTOMER_ID",
+          "datatype": "INTEGER"
+        },
+        {
+          "name": "REGION",
+          "datatype": "STRING"
+        },
+        {
+          "name": "ORDER_AMOUNT",
+          "datatype": "DECIMAL"
+        },
+        {
+          "name": "ORDER_DATE",
+          "datatype": "DATE"
+        }
+      ]
+    }
+  ],
+  "targets": [
+    {
+      "name": "FACT_REGION_ORDER_SUMMARY",
+      "type": "DELTA",
+      "fields": [
+        {
+          "name": "REGION",
+          "datatype": "STRING"
+        },
+        {
+          "name": "ORDER_COUNT",
+          "datatype": "LONG"
+        },
+        {
+          "name": "TOTAL_ORDER_AMOUNT",
+          "datatype": "DECIMAL"
+        },
+        {
+          "name": "AVG_ORDER_AMOUNT",
+          "datatype": "DECIMAL"
+        }
+      ]
+    }
+  ],
+  "transformations": [
+    {
+      "name": "FIL_RECENT_ORDERS",
+      "type": "Filter",
+      "config": {
+        "condition": "ORDER_DATE >= ADD_TO_DATE(CURRENT_DATE, 'DD', -30)"
+      },
+      "ports": []
+    },
+    {
+      "name": "AGG_ORDER_REGION",
+      "type": "Aggregator",
+      "config": {
+        "group_by": [
+          "REGION"
+        ],
+        "aggregates": [
+          {
+            "field": "ORDER_ID",
+            "function": "COUNT",
+            "alias": "ORDER_COUNT"
+          },
+          {
+            "field": "ORDER_AMOUNT",
+            "function": "SUM",
+            "alias": "TOTAL_ORDER_AMOUNT"
+          },
+          {
+            "field": "ORDER_AMOUNT",
+            "function": "AVG",
+            "alias": "AVG_ORDER_AMOUNT"
+          }
+        ]
+      },
+      "ports": []
+    }
+  ],
+  "connectors": [
+    {
+      "from_instance": "SRC_ORDER",
+      "from_field": "ORDER_ID",
+      "to_instance": "FIL_RECENT_ORDERS",
+      "to_field": "ORDER_ID"
+    },
+    {
+      "from_instance": "SRC_ORDER",
+      "from_field": "REGION",
+      "to_instance": "FIL_RECENT_ORDERS",
+      "to_field": "REGION"
+    },
+    {
+      "from_instance": "SRC_ORDER",
+      "from_field": "ORDER_AMOUNT",
+      "to_instance": "FIL_RECENT_ORDERS",
+      "to_field": "ORDER_AMOUNT"
+    },
+    {
+      "from_instance": "SRC_ORDER",
+      "from_field": "ORDER_DATE",
+      "to_instance": "FIL_RECENT_ORDERS",
+      "to_field": "ORDER_DATE"
+    },
+    {
+      "from_instance": "FIL_RECENT_ORDERS",
+      "from_field": "REGION",
+      "to_instance": "AGG_ORDER_REGION",
+      "to_field": "REGION"
+    },
+    {
+      "from_instance": "FIL_RECENT_ORDERS",
+      "from_field": "ORDER_ID",
+      "to_instance": "AGG_ORDER_REGION",
+      "to_field": "ORDER_ID"
+    },
+    {
+      "from_instance": "FIL_RECENT_ORDERS",
+      "from_field": "ORDER_AMOUNT",
+      "to_instance": "AGG_ORDER_REGION",
+      "to_field": "ORDER_AMOUNT"
+    },
+    {
+      "from_instance": "AGG_ORDER_REGION",
+      "from_field": "REGION",
+      "to_instance": "FACT_REGION_ORDER_SUMMARY",
+      "to_field": "REGION"
+    },
+    {
+      "from_instance": "AGG_ORDER_REGION",
+      "from_field": "ORDER_COUNT",
+      "to_instance": "FACT_REGION_ORDER_SUMMARY",
+      "to_field": "ORDER_COUNT"
+    },
+    {
+      "from_instance": "AGG_ORDER_REGION",
+      "from_field": "TOTAL_ORDER_AMOUNT",
+      "to_instance": "FACT_REGION_ORDER_SUMMARY",
+      "to_field": "TOTAL_ORDER_AMOUNT"
+    },
+    {
+      "from_instance": "AGG_ORDER_REGION",
+      "from_field": "AVG_ORDER_AMOUNT",
+      "to_instance": "FACT_REGION_ORDER_SUMMARY",
+      "to_field": "AVG_ORDER_AMOUNT"
+    }
+  ],
+  "field_lineage": [
+    {
+      "from_instance": "SRC_ORDER",
+      "from_field": "ORDER_ID",
+      "to_instance": "FIL_RECENT_ORDERS",
+      "to_field": "ORDER_ID"
+    },
+    {
+      "from_instance": "SRC_ORDER",
+      "from_field": "REGION",
+      "to_instance": "FIL_RECENT_ORDERS",
+      "to_field": "REGION"
+    },
+    {
+      "from_instance": "SRC_ORDER",
+      "from_field": "ORDER_AMOUNT",
+      "to_instance": "FIL_RECENT_ORDERS",
+      "to_field": "ORDER_AMOUNT"
+    },
+    {
+      "from_instance": "SRC_ORDER",
+      "from_field": "ORDER_DATE",
+      "to_instance": "FIL_RECENT_ORDERS",
+      "to_field": "ORDER_DATE"
+    },
+    {
+      "from_instance": "FIL_RECENT_ORDERS",
+      "from_field": "REGION",
+      "to_instance": "AGG_ORDER_REGION",
+      "to_field": "REGION"
+    },
+    {
+      "from_instance": "FIL_RECENT_ORDERS",
+      "from_field": "ORDER_ID",
+      "to_instance": "AGG_ORDER_REGION",
+      "to_field": "ORDER_ID"
+    },
+    {
+      "from_instance": "FIL_RECENT_ORDERS",
+      "from_field": "ORDER_AMOUNT",
+      "to_instance": "AGG_ORDER_REGION",
+      "to_field": "ORDER_AMOUNT"
+    },
+    {
+      "from_instance": "AGG_ORDER_REGION",
+      "from_field": "REGION",
+      "to_instance": "FACT_REGION_ORDER_SUMMARY",
+      "to_field": "REGION"
+    },
+    {
+      "from_instance": "AGG_ORDER_REGION",
+      "from_field": "ORDER_COUNT",
+      "to_instance": "FACT_REGION_ORDER_SUMMARY",
+      "to_field": "ORDER_COUNT"
+    },
+    {
+      "from_instance": "AGG_ORDER_REGION",
+      "from_field": "TOTAL_ORDER_AMOUNT",
+      "to_instance": "FACT_REGION_ORDER_SUMMARY",
+      "to_field": "TOTAL_ORDER_AMOUNT"
+    },
+    {
+      "from_instance": "AGG_ORDER_REGION",
+      "from_field": "AVG_ORDER_AMOUNT",
+      "to_instance": "FACT_REGION_ORDER_SUMMARY",
+      "to_field": "AVG_ORDER_AMOUNT"
+    }
+  ],
+  "execution_order": [
+    "SRC_ORDER",
+    "FIL_RECENT_ORDERS",
+    "AGG_ORDER_REGION",
+    "FACT_REGION_ORDER_SUMMARY"
+  ]
+}

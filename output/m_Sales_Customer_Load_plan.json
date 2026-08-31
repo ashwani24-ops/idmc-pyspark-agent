@@ -1,0 +1,77 @@
+{
+  "mapping": "m_Sales_Customer_Load",
+  "steps": [
+    {
+      "sequence": 1,
+      "name": "AGG_CUSTOMER_REGION",
+      "type": "TARGET",
+      "depends_on": []
+    },
+    {
+      "sequence": 2,
+      "name": "AGG_REGION_CUSTOMERS",
+      "type": "AGGREGATOR",
+      "depends_on": []
+    },
+    {
+      "sequence": 3,
+      "name": "SRC_COUNTRY",
+      "type": "SOURCE",
+      "depends_on": []
+    },
+    {
+      "sequence": 4,
+      "name": "SRC_CUSTOMER",
+      "type": "SOURCE",
+      "depends_on": []
+    },
+    {
+      "sequence": 5,
+      "name": "SRT_CUSTOMER",
+      "type": "SORTER",
+      "depends_on": []
+    },
+    {
+      "sequence": 6,
+      "name": "FIL_ACTIVE_CUSTOMER",
+      "type": "FILTER",
+      "depends_on": [
+        "SRC_CUSTOMER"
+      ]
+    },
+    {
+      "sequence": 7,
+      "name": "EXP_CUSTOMER",
+      "type": "EXPRESSION",
+      "depends_on": [
+        "FIL_ACTIVE_CUSTOMER"
+      ]
+    },
+    {
+      "sequence": 8,
+      "name": "LKP_COUNTRY",
+      "type": "LOOKUP",
+      "depends_on": [
+        "EXP_CUSTOMER"
+      ]
+    },
+    {
+      "sequence": 9,
+      "name": "RTR_CUSTOMER_TIER",
+      "type": "ROUTER",
+      "depends_on": [
+        "LKP_COUNTRY",
+        "EXP_CUSTOMER"
+      ]
+    },
+    {
+      "sequence": 10,
+      "name": "DIM_CUSTOMER",
+      "type": "TARGET",
+      "depends_on": [
+        "RTR_CUSTOMER_TIER",
+        "LKP_COUNTRY"
+      ]
+    }
+  ]
+}

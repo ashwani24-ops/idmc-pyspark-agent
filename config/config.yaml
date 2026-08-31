@@ -1,0 +1,20 @@
+project:
+  name: IDMC2PySpark
+
+claude:
+  model: claude-sonnet-4
+  temperature: 0
+
+repository:
+  input: repository/
+  output: output/
+
+generated:
+  folder: generated/
+
+logging:
+  level: INFO
+
+spark:
+  catalog: main
+  schema: bronze
